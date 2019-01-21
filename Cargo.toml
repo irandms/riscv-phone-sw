@@ -1,0 +1,38 @@
+[package]
+name = "riscv-dumbphone-sw"
+version = "0.1.0"
+authors = ["Spencer Moss <radio@another.computer>"]
+
+[dependencies]
+nb = "0.1.1"
+riscv = "0.3.0"
+riscv-rt = "0.3.0"
+e310x = "0.2.0"
+e310x-hal = "0.2.0"
+hifive = "0.2.0"
+#riscv-rtfm = { path = "riscv-rtfm" }
+#riscv-rtfm-macros = { path = "riscv-rtfm/macros" }
+#riscv-semihosting = { path = "riscv-semihosting" }
+
+[dev-dependencies]
+stlog = "0.3.2"
+
+[build-dependencies]
+cc = "1.0"
+
+[profile.release]
+opt-level = 3
+debug = true
+lto = true
+# workaround rust-lang/rust#47074
+codegen-units = 1
+incremental = false
+
+[profile.dev]
+opt-level = 0
+debug = true
+lto = false
+# workaround rust-lang/rust#47074
+codegen-units = 1
+incremental = false
+

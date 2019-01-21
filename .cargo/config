@@ -1,0 +1,10 @@
+[target.riscv32imac-unknown-none-elf]
+runner = 'riscv32-unknown-elf-gdb'
+rustflags = [
+  "-C", "link-arg=-Tlink.x",
+  "-C", "link-arg=-Tstlog.x",
+  "-C", "linker=riscv32-unknown-elf-ld",
+]
+
+[build]
+target = "riscv32imac-unknown-none-elf"
