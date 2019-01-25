@@ -1,5 +1,5 @@
 [package]
-name = "riscv-dumbphone-sw"
+name = "riscv-phone-sw"
 version = "0.1.0"
 authors = ["Spencer Moss <radio@another.computer>"]
 
