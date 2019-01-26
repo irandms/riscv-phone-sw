@@ -10,7 +10,7 @@ Steps to compile the firmware in this project:
 3. Make sure `xargo` is installed
     * `cargo install xargo`
 4. Follow the steps on [riscv-tools](https://github.com/riscv/riscv-tools) to build the 32-bit RISC-V toolchain for things like gcc, ar, ld, etc. If your distribution of choice packages these binaries (`riscv32-unknown-elf-gcc, riscv32-unknown-elf-*`), you may skip this step and possibly step 5.
-5. Run `./env.sh`, ensuring that the environment variable `$RISCV` is set and that `$RISCV/bin` is in your `$PATH`.
+5. Run `source ./env.sh`, ensuring that the environment variable `$RISCV` is set and that `$RISCV/bin` is in your `$PATH`.
 6. Running `make` should build the entire firmware; running `make upload` will flash a connected HiFive1 or phone board.
 
 Current Issues:
