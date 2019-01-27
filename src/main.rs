@@ -8,7 +8,6 @@ use hifive::hal::stdout::*;
 //use hifive::hal::gpio::gpio0::{Pin2, Pin3, Pin4, Pin5, Pin9, Pin10, IOF_SEL, IOF_EN};
 //use hifive::hal::gpio::{IOF0, NoInvert};
 
-/*
 extern {
     fn init_leds();
 }
@@ -18,7 +17,6 @@ pub fn call() {
         init_leds();
     }
 }
-*/
 
 fn delay() {
     //block!(clint.wait()).unwrap();
