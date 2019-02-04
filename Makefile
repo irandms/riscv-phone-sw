@@ -1,9 +1,10 @@
 FIRMWARE      := riscv-phone-sw
+
 # Example firmware (uncomment one)
 #EXAMPLE       := blinky_clint
-EXAMPLE       := nokia5110
+#EXAMPLE       := nokia5110
 #EXAMPLE       := bridge_example
-#EXAMPLE       := atomiqueue_example
+EXAMPLE       := atomiqueue_example
 
 # Board crate (uncomment one)
 BOARD        := hifive
@@ -14,7 +15,7 @@ OPENOCD_CFG  := hifive-openocd.cfg
 #OPENOCD_CFG  := lofive-openocd.cfg
 
 TARGET       := riscv32imac-unknown-none-elf
-TARGET_DIR   := $(abspath ./target/$(TARGET)/debug)
+TARGET_DIR   := $(abspath ./target/$(TARGET)/release)
 FIRMWARE_DIR := $(TARGET_DIR)
 FIRMWARE_BIN := $(FIRMWARE_DIR)/$(FIRMWARE)
 EXAMPLE_DIR  := $(TARGET_DIR)/examples

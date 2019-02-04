@@ -49,7 +49,7 @@ fn max7221_init(qspi: &hifive::hal::e310x::QSPI1) {
 fn disp_val(qspi : &hifive::hal::e310x::QSPI1, val : u32) {
     let mut newval = val;
     for i in (0..5).rev() {
-        let digval = newval % 10;
+        let digval = (newval % 10) as u8;
         unsafe {
             qspi.csmode.write(|w| w.bits(2));
             qspi_xfer(qspi, i);
