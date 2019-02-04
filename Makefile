@@ -1,6 +1,9 @@
 FIRMWARE      := riscv-phone-sw
 # Example firmware (uncomment one)
-EXAMPLE       := blinky_clint
+#EXAMPLE       := blinky_clint
+EXAMPLE       := nokia5110
+#EXAMPLE       := bridge_example
+#EXAMPLE       := atomiqueue_example
 
 # Board crate (uncomment one)
 BOARD        := hifive
@@ -16,6 +19,19 @@ FIRMWARE_DIR := $(TARGET_DIR)
 FIRMWARE_BIN := $(FIRMWARE_DIR)/$(FIRMWARE)
 EXAMPLE_DIR  := $(TARGET_DIR)/examples
 EXAMPLE_BIN  := $(EXAMPLE_DIR)/$(EXAMPLE)
+
+RISCV_GDB    := $(abspath $(RISCV)/bin/riscv32-unknown-elf-gdb)
+
+GDB_UPLOAD_ARGS ?= --batch
+
+GDB_UPLOAD_CMDS += -ex "set remotetimeout 240"
+GDB_UPLOAD_CMDS += -ex "target extended-remote localhost:3333"
+GDB_UPLOAD_CMDS += -ex "monitor reset halt"
+GDB_UPLOAD_CMDS += -ex "monitor flash protect 0 64 last off"
+GDB_UPLOAD_CMDS += -ex "load"
+GDB_UPLOAD_CMDS += -ex "monitor resume"
+GDB_UPLOAD_CMDS += -ex "monitor shutdown"
+GDB_UPLOAD_CMDS += -ex "quit"
 
 BAUD_RATE := 115200
 TTY := /dev/ttyUSB2
@@ -62,5 +78,15 @@ upload:
 upload_example:
 	openocd -f $(OPENOCD_CFG) \
 		-c "flash protect 0 64 last off; program ${EXAMPLE_BIN}; resume 0x20400000; exit"
+
+upload2:
+	openocd -f $(OPENOCD_CFG) & \
+	$(RISCV_GDB) -n $(FIRMWARE_BIN) $(GDB_UPLOAD_ARGS) $(GDB_UPLOAD_CMDS) && \
+	echo "Successfully uploaded '$(FIRMWARE)' to $(BOARD)."
+
+upload2_example:
+	openocd -f $(OPENOCD_CFG) & \
+	$(RISCV_GDB) -n $(EXAMPLE_BIN) $(GDB_UPLOAD_ARGS) $(GDB_UPLOAD_CMDS) && \
+	echo "Successfully uploaded '$(EXAMPLE_BIN)' to $(BOARD)."
 
 .PHONY: build test clean readelf size objdump dwarfdump gdb openocd upload
