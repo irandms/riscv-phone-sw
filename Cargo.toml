@@ -10,7 +10,6 @@ riscv-rt = "0.3.0"
 e310x = "0.2.0"
 hifive = "0.2.0"
 pcd8544 = "0.1.8"
-atomiqueue = { git = "https://github.com/Inityx/atomiqueue.git" }
 #riscv-alloc = { git = "https://github.com/riscv-rust/riscv-alloc.git" }
 #riscv-rtfm = { path = "riscv-rtfm" }
 #riscv-rtfm-macros = { path = "riscv-rtfm/macros" }
@@ -21,7 +20,8 @@ version = "0.2.0"
 #default-features = false
 #features = ["hfxosc", "lfaltclk"]
 
-#[dev-dependencies]
+[dev-dependencies]
+atomiqueue = { git = "https://github.com/Inityx/atomiqueue.git" }
 #stlog = "0.3.2"
 
 [build-dependencies]
