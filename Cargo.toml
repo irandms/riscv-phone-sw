@@ -11,13 +11,13 @@ e310x = "0.2.0"
 e310x-hal = "0.2.0"
 hifive = "0.2.0"
 pcd8544 = "0.1.8"
-atomiqueue = { git = "https://github.com/Inityx/atomiqueue.git" }
 #riscv-alloc = { git = "https://github.com/riscv-rust/riscv-alloc.git" }
 #riscv-rtfm = { path = "riscv-rtfm" }
 #riscv-rtfm-macros = { path = "riscv-rtfm/macros" }
 #riscv-semihosting = { path = "riscv-semihosting" }
 
-#[dev-dependencies]
+[dev-dependencies]
+atomiqueue = { git = "https://github.com/Inityx/atomiqueue.git" }
 #stlog = "0.3.2"
 
 [build-dependencies]
@@ -38,4 +38,3 @@ lto = false
 # workaround rust-lang/rust#47074
 codegen-units = 1
 incremental = false
-
