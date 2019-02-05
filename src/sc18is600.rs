@@ -1,83 +1,82 @@
-extern crate hifive;
+#![allow(dead_code)]
 
 use hifive::hal::e310x::QSPI1;
 use spi::qspi_xfer;
+use core::iter;
 
-//enum command {
-mod command {
-    pub const WRITE_N: u8                  = 0x00;
-    pub const READ_N: u8                   = 0x01;
-    pub const I2C_READ_AFTER_WRITE: u8     = 0x02;
-    pub const I2C_WRITE_AFTER_WRITE: u8    = 0x03;
-    pub const READ_BUFFER: u8              = 0x06;
-    pub const CONFIGURE_SPI: u8            = 0x18;
-    pub const REG_WRITE: u8                = 0x20;
-    pub const REG_READ: u8                 = 0x21;
-    pub const SLEEP: u8                    = 0x30;
+const DUMMY_BYTE: u8 = 0x00;
+
+enum Command {
+    WriteN             = 0x00,
+    ReadN              = 0x01,
+    I2cReadAfterWrite  = 0x02,
+    I2cWriteAfterWrite = 0x03,
+    ReadBuffer         = 0x06,
+    ConfigureSpi       = 0x18,
+    RegWrite           = 0x20,
+    RegRead            = 0x21,
+    Sleep              = 0x30,
 }
 
-//enum reg_addr {
-mod reg_addr {
-    pub const IO_CONFIG: u8    = 0x00;
-    pub const IO_STATE: u8     = 0x01;
-    pub const I2C_CLOCK: u8    = 0x02;
-    pub const I2C_TIMEOUT: u8  = 0x03;
-    pub const I2C_STATUS: u8   = 0x04;
-    pub const I2C_ADDRESS: u8  = 0x05;
+enum RegAddr {
+    IoConfig   = 0x00,
+    IoState    = 0x01,
+    I2cClock   = 0x02,
+    I2cTimeout = 0x03,
+    I2cStatus  = 0x04,
+    I2cAddress = 0x05,
+}
+
+fn qspi_write_all(
+    qspi: &QSPI1,
+    command: &[u8],
+    payload: impl IntoIterator<Item=u8>,
+) -> u8 {
+    unsafe {
+        qspi.mode  .write(|w| w.phase().set_bit().polarity().set_bit());
+        qspi.csid  .write(|w| w.bits(0b10));
+        qspi.csmode.write(|w| w.bits(0b00));
+    }
+
+    command
+        .iter()
+        .cloned()
+        .chain(payload)
+        .fold(DUMMY_BYTE, |_, byte| qspi_xfer(qspi, byte))
 }
 
 pub fn write_clock(qspi: &QSPI1, clock_hz: u32) -> u8 {
-    unsafe {
-        qspi.mode.write(|w| w.phase().set_bit().polarity().set_bit());
-        qspi.csid.write(|w| w.bits(2));
-        qspi.csmode.write(|w| w.bits(0));
+    let divisor = 4 * clock_hz / (7372800);
 
-        let divisor = 4 * clock_hz / (7372800);
-
-        qspi_xfer(qspi, command::REG_WRITE);
-        qspi_xfer(qspi, reg_addr::I2C_CLOCK);
-        return qspi_xfer(qspi, divisor as u8);
-    }
+    qspi_write_all(
+        qspi,
+        &[Command::RegWrite as u8, RegAddr::I2cClock as u8],
+        iter::once(divisor as u8),
+    )
 }
 
 pub fn read_clock(qspi: &QSPI1) -> u8 {
-    unsafe {
-        qspi.mode.write(|w| w.phase().set_bit().polarity().set_bit());
-        qspi.csid.write(|w| w.bits(2));
-        qspi.csmode.write(|w| w.bits(0));
-
-        qspi_xfer(qspi, command::REG_READ);
-        qspi_xfer(qspi, reg_addr::I2C_CLOCK);
-        let dummy_byte = 0x00;
-        return qspi_xfer(qspi, dummy_byte);
-    }
+    qspi_write_all(
+        qspi,
+        &[Command::RegRead as u8, RegAddr::I2cClock as u8],
+        iter::once(DUMMY_BYTE),
+    )
 }
 
 pub fn write_timeout(qspi: &QSPI1, timeout: u8, enable: bool) -> u8 {
-    let timeout_value = (timeout & 0xFE) | (enable as u8);
+    let timeout = (timeout & 0xFE) | (enable as u8);
 
-    unsafe {
-        qspi.mode.write(|w| w.phase().set_bit().polarity().set_bit());
-        qspi.csid.write(|w| w.bits(2));
-        qspi.csmode.write(|w| w.bits(0));
-
-        qspi_xfer(qspi, command::REG_WRITE);
-        qspi_xfer(qspi, reg_addr::I2C_TIMEOUT);
-        return qspi_xfer(qspi, timeout_value);
-    }
+    qspi_write_all(
+        qspi,
+        &[Command::RegWrite as u8, RegAddr::I2cTimeout as u8],
+        iter::once(timeout),
+    )
 }
 
 pub fn write_n_bytes(qspi: &QSPI1, device_addr: u8, bytes: &[u8]) {
-    unsafe {
-        qspi.mode.write(|w| w.phase().set_bit().polarity().set_bit());
-        qspi.csid.write(|w| w.bits(2));
-        qspi.csmode.write(|w| w.bits(0));
-
-        qspi_xfer(qspi, command::WRITE_N);
-        qspi_xfer(qspi, bytes.len() as u8);
-        qspi_xfer(qspi, device_addr);
-        for byte in bytes.iter() {
-            qspi_xfer(qspi, *byte);
-        }
-    }
+    qspi_write_all(
+        qspi,
+        &[Command::WriteN as u8, bytes.len() as u8, device_addr],
+        bytes.iter().cloned(),
+    );
 }
