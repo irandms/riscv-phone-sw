@@ -84,7 +84,7 @@ fn main() {
             };
         }
 
-        if PUSHED.compare_and_swap(true, false, Ordering::Relaxed) == false {
+        if PUSHED.compare_and_swap(true, false, Ordering::Relaxed) {
             writeln!(stdout, "Timestamp has been pushed!").unwrap();
         }
     }
