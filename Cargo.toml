@@ -5,10 +5,9 @@ authors = ["Spencer Moss <radio@another.computer>"]
 
 [dependencies]
 nb = "0.1.1"
-riscv = "0.3.0"
+riscv = "0.4.0"
 riscv-rt = "0.3.0"
 e310x = "0.2.0"
-e310x-hal = "0.2.0"
 hifive = "0.2.0"
 pcd8544 = "0.1.8"
 atomiqueue = { git = "https://github.com/Inityx/atomiqueue.git" }
@@ -16,6 +15,11 @@ atomiqueue = { git = "https://github.com/Inityx/atomiqueue.git" }
 #riscv-rtfm = { path = "riscv-rtfm" }
 #riscv-rtfm-macros = { path = "riscv-rtfm/macros" }
 #riscv-semihosting = { path = "riscv-semihosting" }
+
+[dependencies.e310x-hal]
+version = "0.2.0"
+#default-features = false
+#features = ["hfxosc", "lfaltclk"]
 
 #[dev-dependencies]
 #stlog = "0.3.2"
@@ -38,4 +42,3 @@ lto = false
 # workaround rust-lang/rust#47074
 codegen-units = 1
 incremental = false
-
