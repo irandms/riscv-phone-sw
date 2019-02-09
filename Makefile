@@ -1,21 +1,26 @@
 FIRMWARE      := riscv-phone-sw
 
-# Example firmware (uncomment one)
+# Example firmware (uncomment one), or specify when calling make
 #EXAMPLE       := blinky_clint
 #EXAMPLE       := nokia5110
 #EXAMPLE       := bridge_example
-EXAMPLE       := atomiqueue_example
+#EXAMPLE       := atomiqueue_example
+#EXAMPLE       := max7221
 
 # Board crate (uncomment one)
 BOARD        := hifive
-#BOARD        := lofive
+#BOARD        := phone-dev-board
 
 # OpenOCD configuration (uncomment one)
 OPENOCD_CFG  := hifive-openocd.cfg
-#OPENOCD_CFG  := lofive-openocd.cfg
+#OPENOCD_CFG  := phone-dev-board.cfg
 
 TARGET       := riscv32imac-unknown-none-elf
+ifndef RELEASE
+TARGET_DIR   := $(abspath ./target/$(TARGET)/debug)
+else
 TARGET_DIR   := $(abspath ./target/$(TARGET)/release)
+endif
 FIRMWARE_DIR := $(TARGET_DIR)
 FIRMWARE_BIN := $(FIRMWARE_DIR)/$(FIRMWARE)
 EXAMPLE_DIR  := $(TARGET_DIR)/examples
@@ -73,21 +78,13 @@ openocd:
 	openocd -f $(OPENOCD_CFG) $(ARGS)
 
 upload:
-	openocd -f $(OPENOCD_CFG) \
-		-c "flash protect 0 64 last off; program ${FIRMWARE_BIN}; resume 0x20400000; exit"
-
-upload_example:
-	openocd -f $(OPENOCD_CFG) \
-		-c "flash protect 0 64 last off; program ${EXAMPLE_BIN}; resume 0x20400000; exit"
-
-upload2:
 	openocd -f $(OPENOCD_CFG) & \
 	$(RISCV_GDB) -n $(FIRMWARE_BIN) $(GDB_UPLOAD_ARGS) $(GDB_UPLOAD_CMDS) && \
 	echo "Successfully uploaded '$(FIRMWARE)' to $(BOARD)."
 
-upload2_example:
+upload_ex:
 	openocd -f $(OPENOCD_CFG) & \
 	$(RISCV_GDB) -n $(EXAMPLE_BIN) $(GDB_UPLOAD_ARGS) $(GDB_UPLOAD_CMDS) && \
 	echo "Successfully uploaded '$(EXAMPLE_BIN)' to $(BOARD)."
 
-.PHONY: build test clean readelf size objdump dwarfdump gdb openocd upload
+.PHONY: build test clean readelf size objdump dwarfdump gdb openocd upload upload_ex
