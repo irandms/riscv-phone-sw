@@ -1,6 +1,6 @@
 # RISCV-V Phone Software
 
-This repository houses source code and associated files used for building examples and runnable firmware for the RISC-V Phone project, designed by Group 16 in Oregon State University's 2018-2019 Electrical & Computer Engineering Senior Design course. The phone's hardware design is located [here](https://github.com/irandms/riscv-phone) Below are some instructions to help you get started with building and running the code.
+This repository houses source code and associated files used for building examples and runnable firmware for the RISC-V Phone project, designed by Group 16 in Oregon State University's 2018-2019 Electrical & Computer Engineering Senior Design course. The phone's hardware design is located [here](https://github.com/irandms/riscv-phone). Below are some instructions to help you get started with building and running the code.
 
 Steps to compile the firmware in this project:
 
