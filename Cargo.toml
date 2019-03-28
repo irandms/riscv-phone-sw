@@ -17,8 +17,8 @@ pcd8544 = "0.1.8"
 
 [dependencies.e310x-hal]
 version = "0.2.0"
-#default-features = false
-#features = ["hfxosc", "lfaltclk"]
+default-features = false
+features = ["hfxosc", "lfaltclk"]
 
 [dev-dependencies]
 atomiqueue = { git = "https://github.com/Inityx/atomiqueue.git" }

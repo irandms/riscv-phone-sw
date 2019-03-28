@@ -26,7 +26,7 @@ FIRMWARE_BIN := $(FIRMWARE_DIR)/$(FIRMWARE)
 EXAMPLE_DIR  := $(TARGET_DIR)/examples
 EXAMPLE_BIN  := $(EXAMPLE_DIR)/$(EXAMPLE)
 
-RISCV_GDB    := $(abspath $(RISCV)/bin/riscv32-unknown-elf-gdb)
+RISCV_GDB    := $(abspath $(RISCV_PATH)/bin/riscv64-unknown-elf-gdb)
 
 GDB_UPLOAD_ARGS ?= --batch
 
@@ -72,7 +72,7 @@ stcat:
 
 # .gdbinit adds a upload command to gdb
 gdb:
-	riscv32-unknown-elf-gdb $(FIRMWARE_BIN) $(ARGS)
+	$(RISCV_GDB) $(FIRMWARE_BIN) $(ARGS)
 
 openocd:
 	openocd -f $(OPENOCD_CFG) $(ARGS)
