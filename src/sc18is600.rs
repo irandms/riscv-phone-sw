@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
 use hifive::hal::e310x::QSPI1;
-use spi::qspi_xfer;
+use qspi::xfer;
 use core::iter;
 
 const DUMMY_BYTE: u8 = 0x00;
@@ -27,31 +27,59 @@ enum RegAddr {
     I2cAddress = 0x05,
 }
 
+fn qspi_configure(qspi: &QSPI1) {
+    unsafe {
+        qspi.mode  .write(|w| w.phase().set_bit().polarity().set_bit());
+        qspi.csid  .write(|w| w.bits(0b10));
+        qspi.csmode.write(|w| w.bits(0b10));
+    }
+}
+
 fn qspi_write_all(
     qspi: &QSPI1,
     command: &[u8],
     payload: impl IntoIterator<Item=u8>,
 ) -> u8 {
-    unsafe {
-        qspi.mode  .write(|w| w.phase().set_bit().polarity().set_bit());
-        qspi.csid  .write(|w| w.bits(0b10));
-        qspi.csmode.write(|w| w.bits(0b00));
-    }
+    qspi_configure(qspi);
 
-    command
+    let result = command
         .iter()
         .cloned()
         .chain(payload)
-        .fold(DUMMY_BYTE, |_, byte| qspi_xfer(qspi, byte))
+        .fold(DUMMY_BYTE, |_, byte| xfer(qspi, byte));
+
+    /*
+    let mut result = 0;
+
+    for byte in command {
+        xfer(qspi, *byte);
+    }
+    for byte in payload {
+        result = xfer(qspi, byte);
+    }
+    //let result = xfer(qspi, DUMMY_BYTE);
+    */
+
+    unsafe {
+        qspi.csmode.write(|w| w.bits(0b00));
+    }
+    result
 }
 
 pub fn write_clock(qspi: &QSPI1, clock_hz: u32) -> u8 {
-    let divisor = 4 * clock_hz / (7372800);
+    let div_val = (7372800) / (4 * clock_hz);
+
+    // 5 and 255 are min/max values specified in datasheet
+    let clamped_div = match div_val {
+        v if v < 5   => 5,
+        v if v > 255 => 255,
+        _            => div_val,
+    };
 
     qspi_write_all(
         qspi,
         &[Command::RegWrite as u8, RegAddr::I2cClock as u8],
-        iter::once(divisor as u8),
+        iter::once(clamped_div as u8),
     )
 }
 
