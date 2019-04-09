@@ -8,7 +8,6 @@ use core::{
     sync::atomic::{AtomicBool, Ordering},
     ptr::null_mut,
 };
-
 use atomiqueue::AtomiQueue;
 use hifive::hal::{
     e310x,
@@ -24,8 +23,8 @@ use riscv::{
 static PUSHED: AtomicBool      = AtomicBool::new(false);
 static QUEUE:  AtomiQueue<u64> = AtomiQueue::new();
 
-static mut MTIMECMP_G: *mut MTIMECMP = null_mut();
-static mut MTIME_G:    *mut MTIME    = null_mut();
+static mut MTIMECMP_G: *mut MTIMECMP         = null_mut();
+static mut MTIME_G:    *mut MTIME            = null_mut();
 
 fn set_mtimecmp(mtime: &MTIME, mtimecmp: &mut MTIMECMP) {
     mtimecmp.set_mtimecmp(mtime.mtime() + 0x8000);
@@ -99,7 +98,6 @@ unsafe fn trap_handler(trap: Trap) {
             set_mtimecmp(&*MTIME_G, &mut *MTIMECMP_G);
         },
         _ => {
-            //writeln!(Stdout(&mut *TX), "In ISR: {}", (*CLAIM_G).claim().unwrap().nr()).unwrap();
         },
     }
 }

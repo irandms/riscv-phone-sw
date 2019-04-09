@@ -1,4 +1,5 @@
 #![no_std]
+#![feature(asm)]
 
 extern crate hifive;
 extern crate pcd8544;
@@ -10,7 +11,9 @@ use pcd8544::PCD8544;
 
 fn delay() {
     for _i in 0..1000 {
-
+        unsafe {
+            asm!("NOP");
+        }
     }
 }
 
@@ -51,14 +54,21 @@ fn main() {
         &mut gpio.iof_en,
     );
 
-    let mut pcd_rst = gpio.pin21.into_output(
+    let mut pcd_rst = gpio.pin11.into_output(
         &mut gpio.output_en,
         &mut gpio.drive,
         &mut gpio.out_xor,
         &mut gpio.iof_en,
     );
 
-    let mut pcd_light = gpio.pin23.into_output(
+    let mut pcd_light = gpio.pin9.into_output(
+        &mut gpio.output_en,
+        &mut gpio.drive,
+        &mut gpio.out_xor,
+        &mut gpio.iof_en,
+    );
+
+    let mut pcd_light_real = gpio.pin19.into_output(
         &mut gpio.output_en,
         &mut gpio.drive,
         &mut gpio.out_xor,
@@ -75,12 +85,19 @@ fn main() {
     );
 
     display.reset();
-    writeln!(display, "Hello World").unwrap();
+    pcd_light_real.set_high();
+    writeln!(display, "Standby").unwrap();
+    writeln!(display, "").unwrap();
+    writeln!(display, ">  Call").unwrap();
+    writeln!(display, "2. Text").unwrap();
+    writeln!(display, "3. Contacts").unwrap();
+    writeln!(display, "4. Settings").unwrap();
 
-    let mut dval = 0;
-    loop {
-        writeln!(display, "{}", dval).unwrap();
-        dval += 1;
+    for _ in 0..200 {
         delay();
     }
+    pcd_light_real.set_low();
+    display.reset();
+
+    loop {};
 }

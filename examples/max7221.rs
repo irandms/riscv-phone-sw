@@ -6,9 +6,9 @@ use hifive::hal::prelude::*;
 use hifive::hal::e310x;
 use hifive::hal::stdout::*;
 
-#[path="../src/spi.rs"]
-mod spi;
-use spi::qspi_xfer;
+#[path="../src/qspi.rs"]
+mod qspi;
+use qspi::xfer;
 
 
 fn delay() {
@@ -20,28 +20,28 @@ fn delay() {
 fn max7221_init(qspi: &hifive::hal::e310x::QSPI1) {
     unsafe {
         qspi.csmode.write(|w| w.bits(2));
-        qspi_xfer(qspi, 0x09);
-        qspi_xfer(qspi, 0xFF);
+        xfer(qspi, 0x09);
+        xfer(qspi, 0xFF);
         qspi.csmode.write(|w| w.bits(3));
 
         qspi.csmode.write(|w| w.bits(2));
-        qspi_xfer(qspi, 0x0A);
-        qspi_xfer(qspi, 0x0F);
+        xfer(qspi, 0x0A);
+        xfer(qspi, 0x0F);
         qspi.csmode.write(|w| w.bits(3));
 
         qspi.csmode.write(|w| w.bits(2));
-        qspi_xfer(qspi, 0x0B);
-        qspi_xfer(qspi, 0x03);
+        xfer(qspi, 0x0B);
+        xfer(qspi, 0x03);
         qspi.csmode.write(|w| w.bits(3));
 
         qspi.csmode.write(|w| w.bits(2));
-        qspi_xfer(qspi, 0x0C);
-        qspi_xfer(qspi, 0x01);
+        xfer(qspi, 0x0C);
+        xfer(qspi, 0x01);
         qspi.csmode.write(|w| w.bits(3));
 
         qspi.csmode.write(|w| w.bits(2));
-        qspi_xfer(qspi, 0x0F);
-        qspi_xfer(qspi, 0x00);
+        xfer(qspi, 0x0F);
+        xfer(qspi, 0x00);
         qspi.csmode.write(|w| w.bits(3));
     }
 }
@@ -52,8 +52,8 @@ fn disp_val(qspi : &hifive::hal::e310x::QSPI1, val : u32) {
         let digval = (newval % 10) as u8;
         unsafe {
             qspi.csmode.write(|w| w.bits(2));
-            qspi_xfer(qspi, i);
-            qspi_xfer(qspi, digval);
+            xfer(qspi, i);
+            xfer(qspi, digval);
             qspi.csmode.write(|w| w.bits(3));
         }
         newval /= 10;

@@ -18,7 +18,7 @@ pub fn xfer(qspi: &QSPI1, payload: u8) -> u8 {
 }
 
 pub fn set_sck(qspi: &QSPI1, speed: time::Hertz, coreclk: time::Hertz) {
-    let div_val = (coreclk.0 / (2 * speed.0) - 1) % 12;
+    let div_val = (coreclk.0 / (2 * speed.0) - 1) & 0xFFF;
     unsafe {
         qspi.div.write(|w| w.bits(div_val));
     }
