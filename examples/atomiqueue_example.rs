@@ -1,15 +1,18 @@
 #![no_std]
+#![no_main]
 
 extern crate riscv;
-extern crate hifive;
+extern crate hifive1;
 extern crate atomiqueue;
+extern crate panic_halt;
 
+use riscv_rt::entry;
 use core::{
     sync::atomic::{AtomicBool, Ordering},
     ptr::null_mut,
 };
 use atomiqueue::AtomiQueue;
-use hifive::hal::{
+use hifive1::hal::{
     e310x,
     stdout::*,
     prelude::*,
@@ -30,17 +33,16 @@ fn set_mtimecmp(mtime: &MTIME, mtimecmp: &mut MTIMECMP) {
     mtimecmp.set_mtimecmp(mtime.mtime() + 0x8000);
 }
 
-fn main() {
+#[entry]
+fn main() -> ! {
     let p = e310x::Peripherals::take().unwrap();
     let mut clint = p.CLINT.split();
     let clocks = Clocks::freeze(
         p.PRCI.constrain(),
-        p.AONCLK.constrain(),
-        &clint.mtime,
-    );
+        p.AONCLK.constrain());
     let mut gpio = p.GPIO0.split();
 
-    let txrx = hifive::tx_rx(
+    let txrx = hifive1::tx_rx(
         gpio.pin17,
         gpio.pin16,
         &mut gpio.out_xor,

@@ -1,12 +1,16 @@
 #![no_std]
+#![no_main]
 #![feature(asm)]
 
-extern crate hifive;
+extern crate hifive1;
 extern crate pcd8544;
+extern crate riscv;
+extern crate panic_halt;
 
-use hifive::hal::prelude::*;
-use hifive::hal::e310x;
-use hifive::hal::stdout::*;
+use riscv_rt::entry;
+use hifive1::hal::prelude::*;
+use hifive1::hal::e310x;
+use hifive1::hal::stdout::*;
 use pcd8544::PCD8544;
 
 fn delay() {
@@ -17,13 +21,12 @@ fn delay() {
     }
 }
 
-fn main() {
+#[entry]
+fn main() -> ! {
     let p = e310x::Peripherals::take().unwrap();
 
-    let clint = p.CLINT.split();
-    let clocks = Clocks::freeze(p.PRCI.constrain(),
-        p.AONCLK.constrain(),
-        &clint.mtime);
+    let _clint = p.CLINT.split();
+    let _clocks = Clocks::freeze(p.PRCI.constrain(), p.AONCLK.constrain());
     let mut gpio = p.GPIO0.split();
 
     let mut pcd_clk = gpio.pin5.into_output(

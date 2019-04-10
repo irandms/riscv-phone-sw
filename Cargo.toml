@@ -1,28 +1,26 @@
 [package]
-name = "riscv-phone-sw"
+name = "riscv_phone_sw"
 version = "0.1.0"
 authors = ["Spencer Moss <radio@another.computer>"]
+edition = "2018"
 
 [dependencies]
 nb = "0.1.1"
-riscv = "0.4.0"
-riscv-rt = "0.3.0"
-e310x = "0.2.0"
-hifive = "0.2.0"
+riscv = "0.5.0"
+riscv-rt = "0.5.0"
+e310x = "0.4.0"
+e310x-hal = "0.4.0"
+hifive1 = { version = "0.4.0", features = ["board-hifive1"] }
 pcd8544 = "0.1.8"
+panic-halt = "0.2.0"
 #riscv-alloc = { git = "https://github.com/riscv-rust/riscv-alloc.git" }
 #riscv-rtfm = { path = "riscv-rtfm" }
 #riscv-rtfm-macros = { path = "riscv-rtfm/macros" }
 #riscv-semihosting = { path = "riscv-semihosting" }
-
-[dependencies.e310x-hal]
-version = "0.2.0"
-default-features = false
-features = ["hfxosc", "lfaltclk"]
+#stlog = "0.3.2"
 
 [dev-dependencies]
 atomiqueue = { git = "https://github.com/Inityx/atomiqueue.git" }
-#stlog = "0.3.2"
 
 [build-dependencies]
 cc = "1.0"
@@ -31,7 +29,6 @@ cc = "1.0"
 opt-level = 3
 debug = true
 lto = true
-# workaround rust-lang/rust#47074
 codegen-units = 1
 incremental = false
 
@@ -39,6 +36,5 @@ incremental = false
 opt-level = 0
 debug = true
 lto = false
-# workaround rust-lang/rust#47074
 codegen-units = 1
 incremental = false

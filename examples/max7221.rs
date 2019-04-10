@@ -1,15 +1,18 @@
 #![no_std]
+#![no_main]
 
-extern crate hifive;
+extern crate hifive1;
+extern crate riscv;
+extern crate panic_halt;
 
-use hifive::hal::prelude::*;
-use hifive::hal::e310x;
-use hifive::hal::stdout::*;
+use riscv_rt::entry;
+use hifive1::hal::prelude::*;
+use hifive1::hal::e310x;
+use hifive1::hal::stdout::*;
 
 #[path="../src/qspi.rs"]
 mod qspi;
 use qspi::xfer;
-
 
 fn delay() {
     for _i in 0..1000 {
@@ -17,7 +20,7 @@ fn delay() {
     }
 }
 
-fn max7221_init(qspi: &hifive::hal::e310x::QSPI1) {
+fn max7221_init(qspi: &hifive1::hal::e310x::QSPI1) {
     unsafe {
         qspi.csmode.write(|w| w.bits(2));
         xfer(qspi, 0x09);
@@ -46,7 +49,7 @@ fn max7221_init(qspi: &hifive::hal::e310x::QSPI1) {
     }
 }
 
-fn disp_val(qspi : &hifive::hal::e310x::QSPI1, val : u32) {
+fn disp_val(qspi : &hifive1::hal::e310x::QSPI1, val : u32) {
     let mut newval = val;
     for i in (0..5).rev() {
         let digval = (newval % 10) as u8;
@@ -60,15 +63,15 @@ fn disp_val(qspi : &hifive::hal::e310x::QSPI1, val : u32) {
     }
 }
 
-fn main() {
+#[entry]
+fn main() -> ! {
     let p = e310x::Peripherals::take().unwrap();
 
     let clint = p.CLINT.split();
     let clocks = Clocks::freeze(p.PRCI.constrain(),
-        p.AONCLK.constrain(),
-        &clint.mtime);
+        p.AONCLK.constrain());
     let mut gpio = p.GPIO0.split();
-    let (tx, rx) = hifive::tx_rx(
+    let (tx, rx) = hifive1::tx_rx(
         gpio.pin17,
         gpio.pin16,
         &mut gpio.out_xor,
@@ -80,7 +83,7 @@ fn main() {
 
     writeln!(Stdout(&mut tx), "hello world!").unwrap();
 
-    let coreclk_speed = clocks.measure_coreclk(&clint.mtime, &clint.mcycle).0;
+    let coreclk_speed = clocks.measure_coreclk(&clint.mcycle).0;
     writeln!(Stdout(&mut tx), "{}", coreclk_speed).unwrap();
     let qspi1 = p.QSPI1;
     let desired_speed = 4_000_000;

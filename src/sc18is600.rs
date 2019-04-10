@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
-use hifive::hal::e310x::QSPI1;
-use qspi::xfer;
+use e310x::QSPI1;
+use crate::qspi::xfer;
 use core::iter;
 
 const DUMMY_BYTE: u8 = 0x00;

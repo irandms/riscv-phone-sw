@@ -1,9 +1,9 @@
 #![allow(dead_code)]
 
-extern crate e310x_hal as hal;
+extern crate e310x_hal;
 
-use self::hal::e310x::QSPI1;
-use self::hal::time;
+use e310x::QSPI1;
+use self::e310x_hal::time;
 
 pub fn xfer(qspi: &QSPI1, payload: u8) -> u8 {
     while qspi.txdata.read().full().bit_is_set() {};

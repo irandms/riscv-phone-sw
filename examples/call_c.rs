@@ -1,24 +1,27 @@
 #![no_std]
+#![no_main]
 
-extern crate hifive;
+extern crate riscv;
+extern crate hifive1;
+extern crate panic_halt;
 
-use hifive::hal::prelude::*;
-use hifive::hal::e310x;
-use hifive::hal::stdout::*;
+use riscv_rt::entry;
+use hifive1::hal::prelude::*;
+use hifive1::hal::e310x::Peripherals;
+use hifive1::hal::stdout::*;
 
-fn main() {
+#[entry]
+fn main() -> ! {
     #[link(name="chello", kind="static")]
     extern {
         fn hello_from_C(); 
     }
 
-    let p = e310x::Peripherals::take().unwrap();
-    let clint = p.CLINT.split();
-    let clocks = Clocks::freeze(p.PRCI.constrain(),
-        p.AONCLK.constrain(),
-        &clint.mtime);
+    let p = Peripherals::take().unwrap();
+    let _clint = p.CLINT.split();
+    let clocks = hifive1::clock::configure(p.PRCI, p.AONCLK, 320.mhz().into());
     let mut gpio = p.GPIO0.split();
-    let (tx, rx) = hifive::tx_rx(
+    let (tx, rx) = hifive1::tx_rx(
         gpio.pin17,
         gpio.pin16,
         &mut gpio.out_xor,
@@ -33,4 +36,6 @@ fn main() {
     unsafe {
         hello_from_C();
     }
+
+    loop {};
 }

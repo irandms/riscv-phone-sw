@@ -1,11 +1,14 @@
 #![no_std]
+#![no_main]
 #![feature(asm)]
 
-extern crate hifive;
+extern crate hifive1;
+extern crate panic_halt;
 
-use hifive::hal::prelude::*;
-use hifive::hal::e310x;
-use hifive::hal::stdout::*;
+use riscv_rt::entry;
+use hifive1::hal::prelude::*;
+use hifive1::hal::stdout::*;
+use hifive1::hal::e310x;
 
 // Horrible workaround for not moving to separate crates
 #[path="../src/sc18is600.rs"]
@@ -24,17 +27,14 @@ fn delay_ms(ms: u32) {
     }
 }
 
-fn main() {
+#[entry]
+fn main() -> ! {
     let p = e310x::Peripherals::take().unwrap();
     let clint = p.CLINT.split();
-    let PRCI_constrained = p.PRCI.constrain();
-    let AON_constrained = p.AONCLK.constrain();
-    let clocks = Clocks::freeze(PRCI_constrained,
-        AON_constrained,
-        &clint.mtime);
+    let clocks = hifive1::clock::configure(p.PRCI, p.AONCLK, 16.mhz().into());
 
     let mut gpio = p.GPIO0.split();
-    let (tx, rx) = hifive::tx_rx(
+    let (tx, rx) = hifive1::tx_rx(
         gpio.pin17,
         gpio.pin16,
         &mut gpio.out_xor,
@@ -57,7 +57,7 @@ fn main() {
         }
     }
 
-    let coreclk_hz = clocks.measure_coreclk(&clint.mtime, &clint.mcycle).0.hz();
+    let coreclk_hz = clocks.measure_coreclk(&clint.mcycle).0.hz();
     let qspi1 = p.QSPI1;
     let desired_sck = 1_000_000;
 
@@ -74,7 +74,6 @@ fn main() {
                  calculated_sck,
                  desired_sck)
             .unwrap();
-        return;
     }
     writeln!(Stdout(&mut tx), "coreclk: {}", coreclk_hz.0).unwrap();
 
@@ -132,7 +131,6 @@ fn main() {
         delay_ms(1);
         let read_clock = sc18is600::read_clock(&qspi1);
         writeln!(Stdout(&mut tx), "scl: {}", read_clock).unwrap();
-        return;
     }
     */
 
