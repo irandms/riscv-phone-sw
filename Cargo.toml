@@ -13,6 +13,7 @@ e310x-hal = "0.4.0"
 hifive1 = { version = "0.4.0", features = ["board-hifive1"] }
 pcd8544 = "0.1.8"
 panic-halt = "0.2.0"
+embedded-hal = "0.2"
 #riscv-alloc = { git = "https://github.com/riscv-rust/riscv-alloc.git" }
 #riscv-rtfm = { path = "riscv-rtfm" }
 #riscv-rtfm-macros = { path = "riscv-rtfm/macros" }

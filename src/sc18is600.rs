@@ -1,8 +1,16 @@
 #![allow(dead_code)]
 
-use e310x::QSPI1;
-use crate::qspi::xfer;
-use core::iter;
+use hifive1::hal::{
+    self,
+    prelude::*,
+    e310x::QSPI1,
+    spi::{Spi, Mode, Polarity, Phase},
+};
+
+use embedded_hal::{
+    digital::OutputPin,
+    spi::MODE_3,
+};
 
 const DUMMY_BYTE: u8 = 0x00;
 
@@ -27,84 +35,133 @@ enum RegAddr {
     I2cAddress = 0x05,
 }
 
-fn qspi_configure(qspi: &QSPI1) {
-    unsafe {
-        qspi.mode  .write(|w| w.phase().set_bit().polarity().set_bit());
-        qspi.csid  .write(|w| w.bits(0b10));
-        qspi.csmode.write(|w| w.bits(0b10));
+pub struct Sc18is600<'a, Cs> {
+    pub cs:   &'a mut Cs,
+    pub clocks: Clocks,
+}
+
+impl <'a, Cs: OutputPin> Sc18is600<'a, Cs> {
+    // Open a session of communication with the SC18IS600 over QSPI1
+    pub fn session<Mosi, Miso, Sck>(
+        &mut self,
+        qspi: QSPI1,
+        pins: (Mosi, Miso, Sck),
+        predicate: impl FnOnce(Writer<Mosi, Miso, Sck, Cs>)
+    ) -> (QSPI1, (Mosi, Miso, Sck))
+    where (Mosi, Miso, Sck): hal::spi::Pins<QSPI1>
+    {
+        let spi_ptr = hifive1::hal::e310x::QSPI1::ptr();
+        // Create Spi object which will be freed at the end of this session
+        let mut spi = Spi::spi1(qspi, pins, MODE_3, 1_000_000_u32.hz(), self.clocks);
+        // the API doesn't expose the delay registers, so here are some raw writes into those registers
+        // to configure them to meet the timing requirements of the SC18IS600
+        unsafe { (*spi_ptr).delay0.write(|w| w.cssck().bits(0b1).sckcs().bits(0b1)); };
+        unsafe { (*spi_ptr).delay1.write(|w| w.intercs().bits(1).interxfr().bits(8)); };
+
+        // Run all of the commands desired in a single session through the Writer struct
+        predicate(Writer(&mut spi, &mut *self.cs));
+
+        spi.free()
     }
 }
 
-fn qspi_write_all(
-    qspi: &QSPI1,
-    command: &[u8],
-    payload: impl IntoIterator<Item=u8>,
-) -> u8 {
-    qspi_configure(qspi);
+pub struct Writer<'a, Mosi, Miso, Sck, Cs: OutputPin>(&'a mut Spi<QSPI1, (Mosi, Miso, Sck)>, &'a mut Cs);
 
-    let result = command
-        .iter()
-        .cloned()
-        .chain(payload)
-        .fold(DUMMY_BYTE, |_, byte| xfer(qspi, byte));
+impl <'a, Mosi, Miso, Sck, Cs: OutputPin> Writer<'a, Mosi, Miso, Sck, Cs> {
+    // Transfer a slice of data to the SC18IS600
+    fn transfer<'buf>(&mut self, buf: &'buf mut [u8]) -> &'buf [u8] {
+        self.1.set_low();
+        let return_buf = self.0.transfer(buf);
+        self.1.set_high();
 
-    /*
-    let mut result = 0;
-
-    for byte in command {
-        xfer(qspi, *byte);
+        return_buf.unwrap()
     }
-    for byte in payload {
-        result = xfer(qspi, byte);
+
+    pub fn write_clock(&mut self, clock_hz: u32) -> u8 {
+        let div_val = (7372800) / (4 * clock_hz);
+
+        // 5 and 255 are min/max values specified in datasheet
+        let clamped_div  = match div_val {
+            v if v < 5   => 5,
+            v if v > 255 => 255,
+            _            => div_val,
+        };
+
+        *self.transfer(&mut[
+            Command::RegWrite as u8,
+            RegAddr::I2cClock as u8,
+            clamped_div as u8
+        ]).last().unwrap()
     }
-    //let result = xfer(qspi, DUMMY_BYTE);
-    */
 
-    unsafe {
-        qspi.csmode.write(|w| w.bits(0b00));
+    pub fn read_io_config(&mut self) -> u8 {
+        *self.transfer(&mut[
+            Command::RegRead as u8,
+            RegAddr::IoConfig as u8,
+            DUMMY_BYTE
+        ]).last().unwrap()
     }
-    result
-}
 
-pub fn write_clock(qspi: &QSPI1, clock_hz: u32) -> u8 {
-    let div_val = (7372800) / (4 * clock_hz);
+    pub fn read_io_state(&mut self) -> u8 {
+        *self.transfer(&mut[
+            Command::RegRead as u8,
+            RegAddr::IoState as u8,
+            DUMMY_BYTE
+        ]).last().unwrap()
+    }
 
-    // 5 and 255 are min/max values specified in datasheet
-    let clamped_div = match div_val {
-        v if v < 5   => 5,
-        v if v > 255 => 255,
-        _            => div_val,
-    };
+    pub fn read_clock(&mut self) -> u8 {
+        *self.transfer(&mut[
+            Command::RegRead as u8,
+            RegAddr::I2cClock as u8,
+            DUMMY_BYTE
+        ]).last().unwrap()
+    }
 
-    qspi_write_all(
-        qspi,
-        &[Command::RegWrite as u8, RegAddr::I2cClock as u8],
-        iter::once(clamped_div as u8),
-    )
-}
+    pub fn read_bus_timeout(&mut self) -> u8 {
+        *self.transfer(&mut[
+            Command::RegRead as u8,
+            RegAddr::I2cTimeout as u8,
+            DUMMY_BYTE
+        ]).last().unwrap()
+    }
 
-pub fn read_clock(qspi: &QSPI1) -> u8 {
-    qspi_write_all(
-        qspi,
-        &[Command::RegRead as u8, RegAddr::I2cClock as u8],
-        iter::once(DUMMY_BYTE),
-    )
-}
+    pub fn read_bus_status(&mut self) -> u8 {
+        *self.transfer(&mut[
+            Command::RegRead as u8,
+            RegAddr::I2cStatus as u8,
+            DUMMY_BYTE
+        ]).last().unwrap()
+    }
 
-pub fn write_timeout(qspi: &QSPI1, timeout: u8, enable: bool) -> u8 {
-    let timeout = (timeout & 0xFE) | (enable as u8);
+    pub fn read_bus_address(&mut self) -> u8 {
+        *self.transfer(&mut[
+            Command::RegRead as u8,
+            RegAddr::I2cAddress as u8,
+            DUMMY_BYTE
+        ]).last().unwrap()
+    }
 
-    qspi_write_all(
-        qspi,
-        &[Command::RegWrite as u8, RegAddr::I2cTimeout as u8],
-        iter::once(timeout),
-    )
-}
+    pub fn write_timeout(&mut self, timeout: u8, enable: bool) -> u8 {
+        let timeout = (timeout & 0xFE) | (enable as u8);
 
-pub fn write_n_bytes(qspi: &QSPI1, device_addr: u8, bytes: &[u8]) {
-    qspi_write_all(
-        qspi,
-        &[Command::WriteN as u8, bytes.len() as u8, device_addr],
-        bytes.iter().cloned(),
-    );
+        *self.transfer(&mut[
+            Command::RegWrite as u8,
+            RegAddr::I2cTimeout as u8,
+            timeout
+        ]).last().unwrap()
+    }
+
+    pub fn write_n_bytes(&mut self, device_addr: u8, bytes: &mut[u8]) {
+        self.transfer(&mut[
+            Command::WriteN as u8,
+            bytes.len() as u8, 
+            device_addr,
+        ]);
+
+        // TODO: fix this, it probably wont work with two separate CS negedges
+        self.1.set_low();
+        self.0.transfer(bytes.as_mut()).unwrap();
+        self.1.set_high();
+    }
 }
