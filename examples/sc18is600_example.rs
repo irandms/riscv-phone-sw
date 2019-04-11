@@ -1,15 +1,21 @@
 #![no_std]
 #![no_main]
-#![feature(asm)]
+#![feature(asm, fn_traits)]
 
 extern crate hifive1;
 extern crate panic_halt;
+extern crate embedded_hal;
 
 use riscv_rt::entry;
 use hifive1::hal::prelude::*;
 use hifive1::hal::e310x::Peripherals;
 use hifive1::hal::stdout::*;
-use hifive1::hal::spi::{Spi, Mode, Polarity, Phase};
+
+
+#[path="../src/sc18is600.rs"]
+mod sc18is600;
+
+use sc18is600::Sc18is600;
 
 fn delay_ms(ms: u32) {
     let clint_ptr = e310x::CLINT::ptr();
@@ -38,70 +44,67 @@ fn main() -> ! {
     );
     let serial = Serial::uart0(p.UART0, (tx, rx), 115_200.bps(), clocks);
     let (mut tx, _) = serial.split();
-    writeln!(Stdout(&mut tx), "SC18IS600 Example").unwrap();
+    writeln!(Stdout(&mut tx), "\nSC18IS600 Example\n").unwrap();
 
-    // Configure SPI pins
     let mosi = gpio.pin3.into_iof0(&mut gpio.out_xor, &mut gpio.iof_sel, &mut gpio.iof_en);
     let miso = gpio.pin4.into_iof0(&mut gpio.out_xor, &mut gpio.iof_sel, &mut gpio.iof_en);
     let sck = gpio.pin5.into_iof0(&mut gpio.out_xor, &mut gpio.iof_sel, &mut gpio.iof_en);
-    let mut cs = gpio.pin10.into_output(&mut gpio.output_en, &mut gpio.drive, &mut gpio.out_xor, &mut gpio.iof_en);
+    let mut bridge_cs = gpio.pin10.into_output(&mut gpio.output_en, &mut gpio.drive, &mut gpio.out_xor, &mut gpio.iof_en);
 
-    // Configure SPI
-    let pins = (mosi, miso, sck);
-    let mode3 = Mode {
-        polarity: Polarity::IdleHigh,
-        phase: Phase::CaptureOnSecondTransition,
+    let qspi = p.QSPI1;
+    let mut bridge = Sc18is600 {
+        cs: &mut bridge_cs,
+        clocks: clocks,
     };
-    let spi_ptr = hifive1::hal::e310x::QSPI1::ptr();
-    let mut spi = Spi::spi1(p.QSPI1, pins, mode3, 1_000_000.hz(), clocks);
 
-    unsafe { (*spi_ptr).delay0.write(|w| w.cssck().bits(0b1).sckcs().bits(0b1)); };
-    unsafe { (*spi_ptr).delay1.write(|w| w.intercs().bits(8).interxfr().bits(8)); };
+    //              expecting 5, 19, 32, 6? 255
+    let clock_speeds = [7200, 97000, 204000, 263000, 369000];
+    let mut clock_iter = clock_speeds.into_iter().cycle();
 
-    let mut reg_idx = 5;
-
-    let mut buf = [0x21, reg_idx, 0xFF];
-    cs.set_low();
-    let r2 = spi.transfer(&mut buf);
-    cs.set_high();
-    writeln!(Stdout(&mut tx), "Register 0x{:x}: {:?}", reg_idx, r2.unwrap().last()).unwrap();
-
-    let mut buf = [0x20, reg_idx, 0x34];
-    writeln!(Stdout(&mut tx), "Writing {:?} to Register 0x{:x}", buf[2], reg_idx).unwrap();
-    cs.set_low();
-    spi.transfer(&mut buf).unwrap();
-    cs.set_high();
-
-    let mut buf = [0x21, reg_idx, 0xFF];
-    cs.set_low();
-    let r2 = spi.transfer(&mut buf);
-    cs.set_high();
-    writeln!(Stdout(&mut tx), "Register 0x{:x}: {:?}", reg_idx, r2.unwrap().last()).unwrap();
-
-    loop {
-        /*
-        let mut buf = [0x20, 0x02, 19];
-        cs.set_low();
-        let r1 = spi.transfer(&mut buf);
-        cs.set_high();
-
-        let mut buf = [0x21, 0x02, 0xFF];
-        cs.set_low();
-        let r2 = spi.transfer(&mut buf);
-        cs.set_high();
-        */
-
-        let mut buf = [0x21, reg_idx, 0xFF];
-        cs.set_low();
-        let r2 = spi.transfer(&mut buf);
-        cs.set_high();
-
-        //writeln!(Stdout(&mut tx), "r1: {:?}", r1.unwrap()).unwrap();
-        writeln!(Stdout(&mut tx), "Register 0x{:x}: {:?}", reg_idx, r2.unwrap().last()).unwrap();
-        delay_ms(1000);
-        reg_idx += 1;
-        if reg_idx > 5 {
-            reg_idx = 0;
+    (0..).fold(
+        (qspi, (mosi, miso, sck)),
+        |(qspi, pins), _| {
+            let mut clock_value_prev = 0;
+            let mut clock_value_new  = 0;
+            let ret = bridge.session(qspi, pins,
+                |mut w| {
+                    clock_value_prev = w.read_clock();
+                    w.write_clock(*clock_iter.next().unwrap());
+                    clock_value_new = w.read_clock();
+                }
+            );
+            writeln!(Stdout(&mut tx), "read olld clock register as {}", clock_value_prev).unwrap();
+            writeln!(Stdout(&mut tx), "read newe clock register as {}", clock_value_new).unwrap();
+            delay_ms(100);
+            ret
         }
-    };
+    );
+
+    //writeln!(Stdout(&mut tx), "\nReading once from each register\n").unwrap();
+    /*
+    loop {
+        for clock_speed in clock_speeds.iter() {
+            let mut buf = [0x21, 0x2, 0xFF];
+            bridge_cs.set_low();
+            let old_clk = spi.transfer(&mut buf);
+            bridge_cs.set_high();
+
+            let mut buf = [0x20, 0x2, clock_speed];
+            bridge_cs.set_low();
+            spi.transfer(&mut buf);
+            bridge_cs.set_high();
+
+            let mut buf = [0x21, 0x2, 0xFF];
+            bridge_cs.set_low();
+            let new_clk = spi.transfer(&mut buf);
+            bridge_cs.set_high();
+
+            //writeln!(Stdout(&mut tx), "read olld clock register as {}", old_clk).unwrap();
+            writeln!(Stdout(&mut tx), "read newe clock register as {}", new_clk).unwrap();
+            //delay_ms(10);
+        }
+    }
+    */
+
+    loop {};
 }
