@@ -80,7 +80,7 @@ openocd:
 upload:
 	openocd -f $(OPENOCD_CFG) & \
 	$(RISCV_GDB) -n $(FIRMWARE_BIN) $(GDB_UPLOAD_ARGS) $(GDB_UPLOAD_CMDS) && \
-	echo "Successfully uploaded '$(FIRMWARE)' to $(BOARD)."
+	echo "Successfully uploaded '$(FIRMWARE_BIN)' to $(BOARD)."
 
 upload_ex:
 	openocd -f $(OPENOCD_CFG) & \

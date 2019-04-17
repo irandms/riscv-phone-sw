@@ -4,7 +4,7 @@ use hifive1::hal::{
     self,
     prelude::*,
     e310x::QSPI1,
-    spi::{Spi, Mode, Polarity, Phase},
+    spi::Spi,
 };
 
 use embedded_hal::{
@@ -13,10 +13,13 @@ use embedded_hal::{
 };
 
 const DUMMY_BYTE: u8 = 0x00;
+const BUFFER_LEN: u8 = 96;
+const WR_BIT:     u8 = 0 << 0;
+const RD_BIT:     u8 = 1 << 0;
 
 enum Command {
-    WriteN             = 0x00,
-    ReadN              = 0x01,
+    I2cWriteN          = 0x00,
+    I2cReadN           = 0x01,
     I2cReadAfterWrite  = 0x02,
     I2cWriteAfterWrite = 0x03,
     ReadBuffer         = 0x06,
@@ -126,6 +129,18 @@ impl <'a, Mosi, Miso, Sck, Cs: OutputPin> Writer<'a, Mosi, Miso, Sck, Cs> {
         ]).last().unwrap()
     }
 
+    pub fn get_bus_status(&mut self) -> &'static str {
+        match self.read_bus_status() {
+            0xF0 => "Transmission successful",
+            0xF1 => "No ACK",
+            0xF2 => "No ACK?",
+            0xF3 => "Bus is busy",
+            0xF8 => "Bus time-out",
+            0xF9 => "Invalid data count.",
+            _    => "Something horrible occured",
+        }
+    }
+
     pub fn read_bus_status(&mut self) -> u8 {
         *self.transfer(&mut[
             Command::RegRead as u8,
@@ -153,15 +168,61 @@ impl <'a, Mosi, Miso, Sck, Cs: OutputPin> Writer<'a, Mosi, Miso, Sck, Cs> {
     }
 
     pub fn write_n_bytes(&mut self, device_addr: u8, bytes: &mut[u8]) {
-        self.transfer(&mut[
-            Command::WriteN as u8,
-            bytes.len() as u8, 
-            device_addr,
-        ]);
-
-        // TODO: fix this, it probably wont work with two separate CS negedges
+        // Send using two calls to the underlying transfer,
+        // in order to only have one falling edge on the chip select line
         self.1.set_low();
+        self.0.transfer(&mut[
+            Command::I2cWriteN as u8,
+            bytes.len() as u8, 
+            device_addr | WR_BIT,
+        ]).unwrap();
         self.0.transfer(bytes.as_mut()).unwrap();
         self.1.set_high();
+    }
+
+    pub fn read_n_bytes(&mut self, device_addr: u8, n: u8) {
+        // Send using two calls to the underlying transfer,
+        // in order to only have one falling edge on the chip select line
+        self.1.set_low();
+        self.0.transfer(&mut[
+            Command::I2cReadN as u8,
+            n,
+            device_addr | RD_BIT,
+        ]).unwrap();
+        self.1.set_high();
+    }
+
+    #[allow(unused_must_use)]
+    pub fn read_after_write(&mut self, device_addr: u8, wr_bytes: &mut[u8], read_n: u8) {
+        self.1.set_low();
+        self.0.transfer(&mut[
+            Command::I2cReadAfterWrite as u8,
+            wr_bytes.len() as u8,
+            read_n,
+            device_addr | WR_BIT,
+        ]);
+        self.0.transfer(wr_bytes.as_mut()).unwrap();
+        self.0.transfer(&mut[
+            device_addr | RD_BIT,
+        ]);
+        self.1.set_high();
+    }
+
+    pub fn read_buffer(&mut self, transfer_buf: &mut [u8]) {
+        self.1.set_low();
+        self.0.transfer(&mut[
+            Command::ReadBuffer as u8,
+        ]).unwrap();
+
+        self.0.transfer(transfer_buf).unwrap();
+        self.1.set_high();
+    }
+
+    pub fn sleep(&mut self) {
+        self.transfer(&mut[
+            Command::Sleep as u8,
+            0x5A,
+            0xA5,
+        ]).last().unwrap();
     }
 }
