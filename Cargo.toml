@@ -5,16 +5,20 @@ authors = ["Spencer Moss <radio@another.computer>"]
 edition = "2018"
 
 [dependencies]
-nb = "0.1.1"
-riscv = "0.5.0"
-riscv-rt = "0.5.0"
-e310x = "0.4.0"
-e310x-hal = "0.4.0"
-hifive1 = { version = "0.4.0", features = ["board-hifive1"] }
-pcd8544 = "0.1.8"
-panic-halt = "0.2.0"
+nb = "0.1"
+riscv = "0.5"
+riscv-rt = "0.5"
+e310x = "0.4"
+e310x-hal = "0.4"
+hifive1 = { version = "0.4", features = ["board-hifive1"] }
+pcd8544 = "0.1"
+panic-halt = "0.2"
 embedded-hal = "0.2"
 #riscv-alloc = { git = "https://github.com/riscv-rust/riscv-alloc.git" }
+
+[dependencies.arrayvec]
+version = "0.4"
+default-features = false
 
 [dev-dependencies]
 atomiqueue = { git = "https://github.com/Inityx/atomiqueue.git" }

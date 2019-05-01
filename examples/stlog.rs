@@ -6,6 +6,7 @@ extern crate hifive1;
 extern crate panic_halt;
 extern crate stlog;
 
+use core::ptr;
 use hifive1::hal::prelude::*;
 use riscv_rt::entry;
 use stlog::{error, global_logger, info, GlobalLog};
@@ -14,10 +15,10 @@ struct Logger;
 impl GlobalLog for Logger {
     fn log(&self, addr: u8) {
         const UART0_ADDRESS: usize = 0x10013000;
-        let dbg_txdata = UART0_ADDRESS as *mut i32;
+        let dbg_txdata = UART0_ADDRESS as *mut u32;
         unsafe {
-            while (*dbg_txdata) & (1 << 31) != 0 {}
-            (*dbg_txdata) |= addr as i32;
+            while ptr::read_volatile(dbg_txdata) != 0 {};
+            ptr::write_volatile(dbg_txdata, addr as u32);
         }
     }
 }

@@ -24,22 +24,17 @@ use hifive1::hal::{
     prelude::*,
     e310x::{
         Peripherals,
-        PLIC,
         UART0,
+        PLIC,
         Interrupt as e310x_Interrupt,
     },
     plic::Priority,
-    clint::{
-        MTIME,
-        MTIMECMP,
-    },
+    stdout::*,
 };
 
 #[global_logger]
 static LOGGER: Logger = Logger;
 
-static mut MTIMECMP_G: *mut MTIMECMP = core::ptr::null_mut(); 
-static mut MTIME_G: *const MTIME = core::ptr::null();
 static mut DBG_TX: *mut hifive1::hal::prelude::Tx<hifive1::hal::e310x::UART0> = core::ptr::null_mut(); 
 static mut DBG_RX: *mut hifive1::hal::prelude::Rx<hifive1::hal::e310x::UART0> = core::ptr::null_mut(); 
 static mut CLAIM: *mut hifive1::hal::plic::CLAIM = core::ptr::null_mut();
@@ -56,13 +51,7 @@ impl GlobalLog for Logger {
     }
 }
 
-
-fn set_mtimecmp(mtime: &MTIME, mtimecmp: &mut MTIMECMP) {
-    let next = mtime.mtime() + 32768;
-    mtimecmp.set_mtimecmp(next);
-}
-
-fn init_peripherals() -> (hifive1::hal::gpio::gpio0::Pin0<hifive1::hal::gpio::Input<hifive1::hal::gpio::Floating>>, hifive1::hal::prelude::Tx<hifive1::hal::e310x::UART0>) {
+fn init_peripherals() -> hifive1::hal::prelude::Tx<hifive1::hal::e310x::UART0> {
     let p = Peripherals::take().unwrap();
     let mut clint = p.CLINT.split();
     let mut plic = p.PLIC.split();
@@ -77,70 +66,49 @@ fn init_peripherals() -> (hifive1::hal::gpio::gpio0::Pin0<hifive1::hal::gpio::In
         &mut gpio.iof_sel,
         &mut gpio.iof_en
     );
-    let pushbtn = gpio.pin0.into_floating_input(&mut gpio.pullup, &mut gpio.input_en, &mut gpio.iof_en);
     let serial = Serial::uart0(p.UART0, (tx, rx), 115_200.bps(), clocks).listen();
     let (mut tx, mut rx) = serial.split();
     plic.mext.enable(); // MEIE bit in MIE register
-    plic.uart0.enable();
+    plic.uart0.enable(); // Enable the UART0 receive interrupt
     plic.threshold.set(Priority::P0); // Listen to any interrupt with priority > 0
-    clint.mtimer.enable();
-    /* Unsafe writes to enable after p.PLIC.split() sets them to 0 */
-    unsafe {
-        (*PLIC::ptr()).enable[0].modify(|r, w| w.bits(r.bits() | (1 << 8)));
-        (*PLIC::ptr()).enable[0].modify(|r, w| w.bits(r.bits() | (1 << 3)));
-        (*PLIC::ptr()).priority[7].modify(|r, w| w.bits(r.bits() | 3));
-        (*PLIC::ptr()).priority[3].modify(|r, w| w.bits(r.bits() | 3));
-    }
+    clint.mtimer.disable(); // Disable timer interrupts
 
     unsafe {
         DBG_TX = &mut tx;
         DBG_RX = &mut rx;
-        MTIME_G = &clint.mtime;
-        MTIMECMP_G = &mut clint.mtimecmp;
         CLAIM = &mut plic.claim;
-        riscv::interrupt::enable(); // MIE bit in MSTATUS register, MSIE in MIE
-    }
-    set_mtimecmp(&clint.mtime, &mut clint.mtimecmp);
+        (*PLIC::ptr()).enable[0].modify(|r, w| w.bits(r.bits() | (1 << 3)));
+        (*PLIC::ptr()).priority[3].modify(|r, w| w.bits(r.bits() | 3));
 
-    (pushbtn, tx)
+        riscv::interrupt::enable(); // MIE bit in MSTATUS register, MSIE in MIE
+    };
+
+    tx
 }
 
 #[entry]
 fn main() -> ! {
-    let (pushbtn, mut tx) = init_peripherals();
+    let mut tx = init_peripherals();
 
-    info!("UART RX + pushbutton interrupt example");
+    writeln!(Stdout(&mut tx), "UART RX Echo").unwrap();
     if cfg!(debug_assertions) {
-        info!("Debug enabled");
+        writeln!(Stdout(&mut tx), "Debug enabled").unwrap();
     }
 
     loop {
-        if cfg!(debug_assertions) {
-            if pushbtn.is_low() {
-                //info!("l");
-            }
-            else {
-                //info!("h");
-            }
-        }
     }
 }
 
 #[no_mangle]
-fn handle_mext_interrupt(intr: e310x_Interrupt) {
+unsafe fn handle_mext_interrupt(intr: e310x_Interrupt) {
     match intr {
-        e310x_Interrupt::GPIO0 => {
-            info!("GPIO0 Interrupt");
-        }
         e310x_Interrupt::UART0 => {
-            unsafe {
-                let read_char = (*UART0::ptr()).rxdata.read().bits();
-                while (*UART0::ptr()).txdata.read().bits() != 0 {};
-                (*UART0::ptr()).txdata.write(|w| w.bits(read_char));
-            }
+            let read_char = (*UART0::ptr()).rxdata.read().bits();
+            while (*UART0::ptr()).txdata.read().bits() != 0 {};
+            (*UART0::ptr()).txdata.write(|w| w.bits(read_char));
         }
         _ => {
-            error!("Other mext interrupt");
+            writeln!(Stdout(&mut *DBG_TX), "other mext int").unwrap();
         }
     }
 }
@@ -148,26 +116,18 @@ fn handle_mext_interrupt(intr: e310x_Interrupt) {
 #[no_mangle]
 unsafe fn handle_interrupt(intr: Interrupt) {
     match intr {
-        Interrupt::MachineTimer => {
-            info!("Machine Timer interrupt");
-            set_mtimecmp(&*MTIME_G, &mut *MTIMECMP_G);
-        }
-        Interrupt::MachineSoft => {
-            info!("Machine Soft interrupt");
-        }
         Interrupt::MachineExternal => {
-            info!("Machine Ext interrupt");
             let claim = (*CLAIM).claim(); match claim {
                 Some(_cause) => { }
                 None => {
-                    error!("Interrupt Claim was empty");
+                    writeln!(Stdout(&mut *DBG_TX), "claim empty").unwrap();
                 }
             }
             handle_mext_interrupt(claim.unwrap());
             (*CLAIM).complete(claim.unwrap());
         }
         _ => {
-            info!("Machine ??? interrupt");
+            writeln!(Stdout(&mut *DBG_TX), "machine ??? int").unwrap();
         }
     }
 }
@@ -178,7 +138,7 @@ unsafe fn handle_exception(excpt: Exception) {
             info!("Breakpoint");
         }
         _ => {
-            error!("Unhandled Exception detected");
+            writeln!(Stdout(&mut *DBG_TX), "Unhandled exception").unwrap();
         }
     }
 }
@@ -193,6 +153,6 @@ unsafe fn trap_handler() {
         handle_exception(excpt);
     }
     else if cfg!(debug_assertions) {
-        error!("No interrupt or debug in trap_handler");
+        writeln!(Stdout(&mut *DBG_TX), "No int or excpt in trap_handler").unwrap();
     }
 }

@@ -73,4 +73,4 @@ reset:
 	openocd -f $(OPENOCD_CFG) & \
 	$(RISCV_GDB) -x reset.gdb
 
-.PHONY: build test clean readelf size objdump dwarfdump gdb openocd upload upload_ex
+.PHONY: build test clean readelf size objdump dwarfdump gdb openocd upload upload
