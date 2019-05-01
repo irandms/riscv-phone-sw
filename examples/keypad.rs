@@ -181,13 +181,12 @@ fn main() -> ! {
     }
 
 
-
     // event fold
     (0..).fold(
         (qspi, (mosi, miso, sck)),
         |(qspi, pins), _| {
             let ret = bridge.session(qspi, pins,
-                |mut w| {
+                |_w| {
                 }
             );
             delay_ms(1000);

@@ -14,6 +14,7 @@ use hifive1::hal::e310x::Peripherals;
 use hifive1::hal::stdout::*;
 use sc18is600::Sc18is600;
 
+#[allow(dead_code)]
 fn delay_ms(ms: u32) {
     let clint_ptr = e310x::CLINT::ptr();
     unsafe {
