@@ -15,13 +15,11 @@ pcd8544 = "0.1.8"
 panic-halt = "0.2.0"
 embedded-hal = "0.2"
 #riscv-alloc = { git = "https://github.com/riscv-rust/riscv-alloc.git" }
-#riscv-rtfm = { path = "riscv-rtfm" }
-#riscv-rtfm-macros = { path = "riscv-rtfm/macros" }
-#riscv-semihosting = { path = "riscv-semihosting" }
-#stlog = "0.3.2"
 
 [dev-dependencies]
 atomiqueue = { git = "https://github.com/Inityx/atomiqueue.git" }
+riscv-semihosting = { path = "../riscv-semihosting" }
+stlog = "0.3.2"
 
 [build-dependencies]
 cc = "1.0"
