@@ -8,6 +8,5 @@ fn main() {
         .flag("-march=rv32imac")
         .flag("-mabi=ilp32")
         .flag("-mcmodel=medlow")
-        .include("include")
         .compile("chello");
 }
