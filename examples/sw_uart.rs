@@ -1,6 +1,6 @@
 #![no_std]
 #![no_main]
-#![feature(asm, fn_traits)]
+#![feature(asm, fn_traits, never_type)]
 #![allow(unreachable_code)] 
 #![feature(type_ascription)]
 
@@ -30,21 +30,65 @@ use hifive1::hal::{
         CLAIM,
     },
     gpio::{
+        Input,
+        PullUp,
         Output,
         Regular,
         NoInvert,
-        gpio0::Pin18,
+        gpio0::{
+            Pin16,
+            Pin17,
+            Pin18,
+        },
     },
     stdout::*,
 };
 use atomiqueue::AtomiQueue;
+use embedded_hal::{
+    serial,
+    digital::OutputPin,
+};
 
-static mut DBG_TX: *mut Tx<UART0> = core::ptr::null_mut(); 
-static mut DBG_RX: *mut Rx<UART0> = core::ptr::null_mut(); 
+#[no_mangle]
+fn delay_cycles(cyc: u32) {
+    let clint_ptr = e310x::CLINT::ptr();
+    unsafe {
+        for _ in 0..cyc {
+           asm!("NOP" :::: "volatile");
+        }
+    }
+}
+
+use embedded_hal::serial::Write;
+use nb::Result;
+
+struct SoftwareSerial<'pin, Pin: OutputPin>(pub &'pin mut Pin);
+
+impl<'pin, Pin: OutputPin> Write<u8> for SoftwareSerial<'pin, Pin> {
+    type Error = !;
+
+    fn flush(&mut self) -> Result<(), Self::Error> { Ok(()) }
+
+    fn write(&mut self, byte: u8) -> Result<(), Self::Error> {
+        for bit in 0..8 {
+            if (byte.wrapping_shr(bit) & 0b1) == 0b1 {
+                self.0.set_high();
+            } else {
+                self.0.set_low();
+            }
+
+            delay_cycles(139);
+        }
+
+        Ok(())
+    }
+}
+
 static mut CLAIM: *mut CLAIM = core::ptr::null_mut();
 static RX_BUF: AtomiQueue<u8> = AtomiQueue::new();
 
-fn init_peripherals() -> (Tx<UART0>,
+fn init_peripherals() -> (Pin17<Output<Regular<NoInvert>>>,
+                          Pin16<Input<PullUp>>,
                           Pin18<Output<Regular<NoInvert>>>) {
     let p = Peripherals::take().unwrap();
     let mut clint = p.CLINT.split();
@@ -53,52 +97,44 @@ fn init_peripherals() -> (Tx<UART0>,
 
     p.GPIO0.rise_ie.write(|w| w.pin0().bit(true));
     let mut gpio = p.GPIO0.split();
-    let (tx, rx) = hifive1::tx_rx(
-        gpio.pin17,
-        gpio.pin16,
-        &mut gpio.out_xor,
-        &mut gpio.iof_sel,
-        &mut gpio.iof_en
-    );
+    let mut sw_tx   = gpio.pin17.into_output(&mut gpio.output_en, &mut gpio.drive, &mut gpio.out_xor, &mut gpio.iof_en);
+    let sw_rx       = gpio.pin16.into_pull_up_input(&mut gpio.pullup, &mut gpio.input_en, &mut gpio.iof_en);
     let mut mux_sel = gpio.pin18.into_output(&mut gpio.output_en, &mut gpio.drive, &mut gpio.out_xor, &mut gpio.iof_en);
     mux_sel.set_high();
-    let serial = Serial::uart0(p.UART0, (tx, rx), 115_200.bps(), clocks).listen();
-    let (mut tx, mut rx) = serial.split();
     plic.mext.enable(); // MEIE bit in MIE register
     plic.uart0.enable(); // Enable the UART0 receive interrupt
     plic.threshold.set(Priority::P0); // Listen to any interrupt with priority > 0
     clint.mtimer.disable(); // Disable timer interrupts
 
     unsafe {
-        DBG_TX = &mut tx;
-        DBG_RX = &mut rx;
         CLAIM = &mut plic.claim;
         (*PLIC::ptr()).enable[0].modify(|r, w| w.bits(r.bits() | (1 << 3)));
         (*PLIC::ptr()).priority[3].modify(|r, w| w.bits(r.bits() | 3));
+        (*UART0::ptr()).ie.write(|w| w.txwm().bit(false).rxwm().bit(true));
 
         riscv::interrupt::enable(); // MIE bit in MSTATUS register, MSIE in MIE
     };
 
-    (tx, mux_sel)
+    (sw_tx, sw_rx, mux_sel)
 }
 
 #[entry]
 fn main() -> ! {
-    let (mut tx, mut mux_sel) = init_peripherals();
+    let (mut sw_tx, sw_rx, mut mux_sel) = init_peripherals();
 
-    writeln!(Stdout(&mut tx), "UART REPL").unwrap();
+    writeln!(Stdout(&mut sw_tx), "UART REPL").unwrap();
     if cfg!(debug_assertions) {
-        writeln!(Stdout(&mut tx), "Debug enabled").unwrap();
+        writeln!(Stdout(&mut sw_tx), "Debug enabled").unwrap();
     }
 
-    write!(Stdout(&mut tx), "\n>").unwrap(); // prompt
+    write!(Stdout(&mut sw_tx), "\n>").unwrap(); // prompt
     loop {
         if let Ok(Some(ch)) = RX_BUF.back() {
             if ch == '\r' as u8 {
                 mux_sel.toggle();
                 // Display the received string upon CR
                 while let Ok(Some(print_ch)) = RX_BUF.pop() {
-                    write!(Stdout(&mut tx), "{}", print_ch as char).unwrap();
+                    write!(Stdout(&mut sw_tx), "{}", print_ch as char).unwrap();
                 }
             }
         }
@@ -118,7 +154,6 @@ unsafe fn handle_mext_interrupt(intr: e310x_Interrupt) {
             (*UART0::ptr()).txdata.write(|w| w.data().bits(read_char));
         }
         _ => {
-            writeln!(Stdout(&mut *DBG_TX), "other mext int").unwrap();
         }
     }
 }
@@ -130,14 +165,12 @@ unsafe fn handle_interrupt(intr: Interrupt) {
             let claim = (*CLAIM).claim(); match claim {
                 Some(_cause) => { }
                 None => {
-                    writeln!(Stdout(&mut *DBG_TX), "claim empty").unwrap();
                 }
             }
             handle_mext_interrupt(claim.unwrap());
             (*CLAIM).complete(claim.unwrap());
         }
         _ => {
-            writeln!(Stdout(&mut *DBG_TX), "machine ??? int").unwrap();
         }
     }
 }
