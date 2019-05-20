@@ -10,6 +10,7 @@ mod eeprom;
 extern crate hifive1;
 extern crate panic_halt;
 extern crate embedded_hal;
+extern crate shared_bus;
 
 use riscv::{
     register::{
@@ -39,7 +40,8 @@ use embedded_hal::spi::MODE_0;
 
 static mut DBG_TX: *mut Tx<UART0> = core::ptr::null_mut(); 
 
-fn init_peripherals() -> Tx<UART0> {
+#[entry]
+fn main() -> ! {
     let p = Peripherals::take().unwrap();
     let mut clint = p.CLINT.split();
     let mut plic = p.PLIC.split();
@@ -59,15 +61,6 @@ fn init_peripherals() -> Tx<UART0> {
     let mut mux_sel = gpio.pin18.into_output(&mut gpio.output_en, &mut gpio.drive, &mut gpio.out_xor, &mut gpio.iof_en);
     mux_sel.set_high();
 
-    let mosi = gpio.pin3.into_iof0(&mut gpio.out_xor, &mut gpio.iof_sel, &mut gpio.iof_en);
-    let miso = gpio.pin4.into_iof0(&mut gpio.out_xor, &mut gpio.iof_sel, &mut gpio.iof_en);
-    let sck = gpio.pin5.into_iof0(&mut gpio.out_xor, &mut gpio.iof_sel, &mut gpio.iof_en);
-    let mut eeprom_cs = gpio.pin2.into_output(&mut gpio.output_en, &mut gpio.drive, &mut gpio.out_xor, &mut gpio.iof_en);
-    let spi_pins = (mosi, miso, sck);
-    let spi = Spi::spi1(p.QSPI1, spi_pins, MODE_0, 1_000_000_u32.hz(), clocks);
-
-    let eeprom = eeprom::M95xxx::new(&spi, &mut eeprom_cs);
-
     unsafe {
         clint.mtimer.disable();
         plic.mext.disable(); // MEIE bit in MIE register
@@ -83,18 +76,52 @@ fn init_peripherals() -> Tx<UART0> {
         riscv::interrupt::enable(); // MIE bit in MSTATUS register, MSIE in MIE
     };
 
-    tx
-}
 
-#[entry]
-fn main() -> ! {
-    let mut tx = init_peripherals();
+    let mosi = gpio.pin3.into_iof0(&mut gpio.out_xor, &mut gpio.iof_sel, &mut gpio.iof_en);
+    let miso = gpio.pin4.into_iof0(&mut gpio.out_xor, &mut gpio.iof_sel, &mut gpio.iof_en);
+    let sck = gpio.pin5.into_iof0(&mut gpio.out_xor, &mut gpio.iof_sel, &mut gpio.iof_en);
+    let mut eeprom_cs = gpio.pin2.into_output(&mut gpio.output_en, &mut gpio.drive, &mut gpio.out_xor, &mut gpio.iof_en);
+    let spi_pins = (mosi, miso, sck);
+    let spi = Spi::spi1(p.QSPI1, spi_pins, MODE_0, 1_000_000_u32.hz(), clocks);
+
+    //let spi_manager = shared_bus::RISCVBusManager::new(spi);
+    //let eeprom = eeprom::M95xxx::new(spi_manager.acquire(), eeprom_cs).unwrap();
+    let mut eeprom = eeprom::M95xxx::new(spi, eeprom_cs).unwrap();
 
     writeln!(Stdout(&mut tx), "EEPROM/Contacts test").unwrap();
     if cfg!(debug_assertions) {
         writeln!(Stdout(&mut tx), "Debug enabled").unwrap();
     }
 
+    let mut overall_loop = 0;
+    writeln!(Stdout(&mut tx), "Writing 11000011 into the first page of memory (64 bytes)").unwrap();
+    let mut eeprom_addr = 0;
+    loop {
+        //writeln!(Stdout(&mut tx), "Writing byte {}...", eeprom_addr).unwrap();
+        match eeprom.write(eeprom_addr as u16, 0b1100_0011) {
+            Ok(_) => {
+                eeprom_addr += 1;
+            },
+            Err(e) => {
+                //writeln!(Stdout(&mut tx), "{:?}", e).unwrap();
+            }
+        }
+        if eeprom_addr == 64 {
+            break;
+        }
+        //overall_loop += 1;
+        if overall_loop > 100000 {
+            break;
+        }
+    }
+
+    writeln!(Stdout(&mut tx), "Reading the first page of memory (64 bytes)").unwrap();
+    for eeprom_addr in 0..64 {
+        let eeprom_read_byte = eeprom.read(eeprom_addr as u16).unwrap();
+        writeln!(Stdout(&mut tx), "{:b}", eeprom_read_byte as u8).unwrap();
+    }
+
+    writeln!(Stdout(&mut tx), "Example over").unwrap();
     loop {
     }
 }

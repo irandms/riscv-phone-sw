@@ -14,16 +14,15 @@ hifive1 = { version = "0.4", features = ["board-hifive1"] }
 pcd8544 = "0.1"
 panic-halt = "0.2"
 embedded-hal = "0.2"
+atomiqueue = { git = "https://github.com/Inityx/atomiqueue.git" }
 #riscv-alloc = { git = "https://github.com/riscv-rust/riscv-alloc.git" }
 
-[dependencies.arrayvec]
-version = "0.4"
-default-features = false
+[dependencies.shared-bus]
+path = "../shared-bus"
+features = ["risc-v"]
 
 [dev-dependencies]
-atomiqueue = { git = "https://github.com/Inityx/atomiqueue.git" }
-riscv-semihosting = { path = "../riscv-semihosting" }
-stlog = "0.3.2"
+stlog = "0.3"
 
 [build-dependencies]
 cc = "1.0"
