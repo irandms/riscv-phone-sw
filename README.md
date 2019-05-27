@@ -4,19 +4,27 @@ This repository houses source code and associated files used for building exampl
 
 Steps to compile the firmware in this project:
 
-1. Install rustc nightly via rustup (recommended method, and nightly is required to build some of the crates used) and set it as the default toolchain.
+1. Install rustc nightly via [rustup](https://rustup.rs/) (recommended method, and nightly is required to build) and set it as the default toolchain.
     * `rustup toolchain install nightly`
     * `rustup default nightly`
 2. Install the `riscv32imac-unknown-none-elf` target via rustup
     * `rustup target add riscv32imac-unknown-none-elf`
 3. Make sure `xargo` is installed
     * `cargo install xargo`
-4. Follow the steps on [riscv-tools](https://github.com/riscv/riscv-tools) to build the 32-bit RISC-V toolchain for things like gcc, ar, ld, etc. If your distribution of choice packages these binaries (`riscv32-unknown-elf-gcc, riscv32-unknown-elf-*`), you may skip this step and possibly step 5.
-5. Run `source ./env.sh`, ensuring that the environment variable `$RISCV` is set and that `$RISCV/bin` is in your `$PATH`.
-6. Running `make` or `cargo build` should build the entire firmware; running `make upload` will flash a connected HiFive1 or phone board with the compiled binary.
+4. Install the RISC-V GNU Embedded Toolchain and OpenOCD. SiFive provides system binaries [here](https://www.sifive.com/boards) with install instructions [here](https://github.com/sifive/freedom-e-sdk), although the most pertinent steps are as follows:
+    * Download the appropriate .tar.gz for your platform (both the GNU Toolchain and OpenOCD)
+    * Unpack each to its own desired location/folder
+    * Create the RISCV_OPENOCD_PATH and RISCV_PATH environment variables in your shell of choice. Below is an example of the necessary environment variables
+
+```
+export RISCV_OPENOCD_PATH=/my/desired/location/openocd
+export RISCV_PATH=/my/desired/location/riscv64-unknown-elf-gcc-<date>-<version>
+export CC_riscv32imac_unknown_none_elf=$RISCV_PATH/bin/riscv64-unknown-elf-gcc
+export PATH=$PATH:$RISCV_PATH/bin:$RISCV_OPENOCD_PATH/bin
+```
+
+5. Running `make` or `cargo build` should build the entire firmware; running `make upload` will flash a connected HiFive1 or phone board with the compiled binary. Note that to compile and run examples, you must do `cargo build --examples` and `make upload EXAMPLE=<examplename>` instead. To compile and run release versions, do `cargo build --examples --release` and `make upload EXAMPLE=<examplename> RELEASE=true`
 
 ** Note: ** Much of the inital work in this repository is exploratory, and code in the `examples/` directory may not function properly.
 
 # Current Issues:
-
-* The crate `riscv-rt` has a fix for the `panic_implementation` directive that was deprecated in favor of `panic_handler`, but `cargo` will try and check out version 0.3.0 of this crate rather than the most recent commit. Temporary workaround is to apply the latest [commit](https://github.com/rust-embedded/riscv-rt/commit/4204328320fca54f29a90e22bf1f80a54e168109) (commit hash 4204328) to the local copy that cargo checks out; if the firmware doesn't build due to an error that mentions `panic_implementation`, it will show the local path to this file to manually apply this commit/patch.
