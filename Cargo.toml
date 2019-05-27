@@ -18,7 +18,7 @@ atomiqueue = { git = "https://github.com/Inityx/atomiqueue.git" }
 #riscv-alloc = { git = "https://github.com/riscv-rust/riscv-alloc.git" }
 
 [dependencies.shared-bus]
-path = "../shared-bus"
+git = "https://github.com/irandms/shared-bus.git"
 features = ["risc-v"]
 
 [dev-dependencies]
