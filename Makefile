@@ -4,8 +4,8 @@
 #EXAMPLE       := atomiqueue_example
 
 # OpenOCD configuration (uncomment one)
-#OPENOCD_CFG  := hifive-openocd.cfg
-OPENOCD_CFG  := g002-openocd.cfg
+OPENOCD_CFG  := hifive-openocd.cfg
+#OPENOCD_CFG  := g002-openocd.cfg
 
 TARGET       := riscv32imac-unknown-none-elf
 
