@@ -5,19 +5,19 @@ This repository houses source code and associated files used for building exampl
 Steps to compile the firmware in this project:
 
 1. Install rustc nightly via [rustup](https://rustup.rs/) (recommended method, and nightly is required to build) and set it as the default toolchain. (
-    * `rustup toolchain install nightly-2019-02-18`
+    * `rustup toolchain install nightly`
     * `rustup default nightly`
 2. Install the `riscv32imac-unknown-none-elf` target via rustup
     * `rustup target add riscv32imac-unknown-none-elf`
 3. Install the RISC-V GNU Embedded Toolchain and OpenOCD. SiFive provides system binaries [here](https://www.sifive.com/boards) with install instructions [here](https://github.com/sifive/freedom-e-sdk), although the most pertinent steps are as follows:
     * Download the appropriate .tar.gz for your platform (both the GNU Toolchain and OpenOCD)
     * Unpack each to its own desired location/folder
-    * Create the RISCV_OPENOCD_PATH and RISCV_PATH environment variables in your shell of choice, adding both bin folders to your PATH. For now you will also need CC_riscv32imac_unknown_none_elf.Below is an example of the necessary environment variables:
+    * Create the RISCV_OPENOCD_PATH and RISCV_PATH environment variables in your shell of choice, adding both bin folders to your PATH. For now you will also need CC_riscv32imac_unknown_none_elf (to satisfy the cargo setup). Below is an example of the necessary environment variables:
 ```
 export RISCV_OPENOCD_PATH=/my/desired/location/openocd
 export RISCV_PATH=/my/desired/location/riscv64-unknown-elf-gcc-<date>-<version>
-export CC_riscv32imac_unknown_none_elf=$RISCV_PATH/bin/riscv64-unknown-elf-gcc
 export PATH=$PATH:$RISCV_PATH/bin:$RISCV_OPENOCD_PATH/bin
+export CC_riscv32imac_unknown_none_elf=riscv64-unknown-elf-gcc
 ```
 4. Running `make` or `cargo build` should build the entire firmware; running `make upload` will flash a connected HiFive1 or phone board with the compiled binary. Note that to compile and run examples, you must do `cargo build --examples` and `make upload EXAMPLE=<examplename>` instead. To compile and run release versions, do `cargo build --examples --release` and `make upload EXAMPLE=<examplename> RELEASE=true`
 
